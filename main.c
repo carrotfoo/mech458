@@ -1,3 +1,4 @@
+ 
 /*
 * project.c
     Course      : UVic Mechatronics 458
@@ -6,8 +7,8 @@
 
     Name 1: Blake Baldwin    Student ID: V00917567
     Name 2: Hamza Siddique  Student ID: V00998771
-    
- */ 
+
+ */
 
 #include <stdlib.h>
 #include <avr/io.h>
@@ -20,9 +21,9 @@ unsigned int direction; //direction of belt
 // Function declerations ==================================
     //basic timer (such as mTimer)
     void mTimer(int count);
-    //motor forward (mot_CCW)
-    //motor backwards (mot_CW)
-    //motor break (mot_stop)
+    void mot_CCW();     //motor forward
+    void mot_CW();      //motor backwards
+    void mot_stop();    //motor break
 
 
 int main(){
@@ -32,15 +33,15 @@ int main(){
     CLKPR = 0x80;
     CLKPR = 0x01; // sets CPU clock to 8MHz
 
-    // Configure Interupts
+    // Configure Interrupts
     cli(); // disable global interrupts
     sei(); // enable global interrupts
 
-    // Configure Interupt 2
+    // Configure Interrupt 2
     EIMSK |= (_BV(INT2)); // enable INT2
     EICRA |= (_BV(ISC21) | _BV(ISC20)); // rising edge interrupt
 
-    // Configure Interupt 3
+    // Configure Interrupt 3
     EIMSK |= (_BV(INT3)); // enable INT3
     EICRA |= (_BV(ISC31)); // falling edge interrupt
 
@@ -64,13 +65,18 @@ int main(){
 
     // Initialize LCD
 
-    //
+    direction = 1; //set initial direction
     while(1){
-        PORTC = 0xff;
+        if (direction){ // 
+            mot_CW();
+            mTimer(5000);
+            mot_CCW();
+        }
+
     }
 
-    return(0);    // this line should never execute 
-    
+    return(0);    // this line should never execute
+
 }
 
 // ISRs ===================================================
@@ -84,8 +90,9 @@ ISR(INT2_vect){
 
 // kill switch on button pull down
 ISR(INT3_vect){ //kill switch
-    PORTA = 0b00001111; // break high
-    cli(); //disable interrupts
+    //PORTA = 0b00001111; // break high
+    mot_stop(); // break high
+	cli(); //disable interrupts
     while(1){ // infinite loop of flashing leds
         PORTL = 0xF0;
         mTimer(500);
@@ -97,7 +104,7 @@ ISR(INT3_vect){ //kill switch
 // Functions ++++++++++++++++++++++++++++++++++++++++++++++
 // mTimer, basic polling method timer, not interrupt driven
 void mTimer (int count) {
-      
+
    int i;
 
    i = 0;
@@ -111,15 +118,33 @@ void mTimer (int count) {
    TCNT1 = 0x0000; //sets initial timer value
    //TIMSK1 = TIMSK1 | 0b00000010; //enable output compare interrupt enable
    TIFR1 |= _BV(OCF1A); //clear timer interrupt flag and begin new timing
-   
+
    //poll the timer
    while(i<count){
        if((TIFR1 & 0x02) == 0x02){
            TIFR1 |= _BV(OCF1A);//clear interrupt by writing a ONE to the bit
            i++;
-           
+
        }//if
-       
+
    }//while
    return;
+}
+
+void mot_CCW() {
+    PORTA = 0b00001111; // Initially brake
+    mTimer(20); // Wait a bit
+    PORTA = 0b00001110; // Drive forward (CCW)
+	direction = 1;
+}
+
+void mot_CW() {
+    PORTA = 0b00001111; // Initially brake
+    mTimer(20); // Wait a bit
+    PORTA = 0b00001101; // Drive reverse (CW)
+	direction = 0;
+}
+
+void mot_stop() {
+    PORTA = 0b00001111; // Brake high to stop the motor
 }
