@@ -3,8 +3,6 @@ My mechatronics project
 
 ## Current features in main
 ### Tested:
-n/a
-### Untested:
 mTimer
 INT2 OR (Optical Sensor OR) trigger
 INT3 Kill button
