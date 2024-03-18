@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 
 // Global Variables =======================================
 unsigned int direction; //direction of belt
@@ -28,8 +29,8 @@ int main(){
     // Initial Configeruation ==============================
 
     // Define clock speed as required
-	CLKPR = 0x80;
-	CLKPR = 0x01; // sets CPU clock to 8MHz
+    CLKPR = 0x80;
+    CLKPR = 0x01; // sets CPU clock to 8MHz
 
     // Configure Interupts
     cli(); // disable global interrupts
@@ -41,58 +42,62 @@ int main(){
 
     // Configure Interupt 3
     EIMSK |= (_BV(INT3)); // enable INT3
-	EICRA |= (_BV(ISC31)); // falling edge interrupt
+    EICRA |= (_BV(ISC31)); // falling edge interrupt
 
     // Configure ADC
 
     // Configure Pin I/O
     DDRA = 0x3f; // set six lsb of port a as output, controls motor
-	DDRB = 0xff; // set port b as output
+    DDRB = 0xff; // set port b as output
+    DDRC = 0xff; // set port c as output
     DDRL = 0xf0; // set 4 msb of port l as output
 
     // Configure PWM TODO change below to use _BV function
     //Set Timer 0 to Fast PWM
-	TCCR0A = TCCR0A | 0b00000011; //enable WGM01 & WGM00
-	//Set compare match output mode clear on compare match
-	TCCR0A = TCCR0A | 0b10000000; //set COM0A1 & COM0A0
-	//Set prescale value in TCCR0B
-	TCCR0B = TCCR0B | 0b00000010; //set CS02, CS01 , CS00
-	//Set OCRA to desired duty cycle
-	OCR0A = 0x7F; // 50% duty cycle
+    TCCR0A = TCCR0A | 0b00000011; //enable WGM01 & WGM00
+    //Set compare match output mode clear on compare match
+    TCCR0A = TCCR0A | 0b10000000; //set COM0A1 & COM0A0
+    //Set prescale value in TCCR0B
+    TCCR0B = TCCR0B | 0b00000010; //set CS02, CS01 , CS00
+    //Set OCRA to desired duty cycle
+    OCR0A = 0x7F; // 50% duty cycle
 
     // Initialize LCD
 
+    //
+    while(1){
+        PORTC = 0xff;
+    }
 
+    return(0);    // this line should never execute 
     
 }
 
 // ISRs ===================================================
-// Interupt 2 OR Trigger
+// Interrupt 2 OR Trigger
 ISR(INT2_vect){
-	mTimer(20);
-	if(PD2){ // this line is not working I want it to only trigger if the pin is still high
-		PORTL = 0xF0;
-		mTimer(500);
-		PORTL = 0x00;
-	}
+    mTimer(20);
+    PORTL = 0xF0;
+    mTimer(500);
+    PORTL = 0x00;
 }
 
 // kill switch on button pull down
 ISR(INT3_vect){ //kill switch
-	PORTA = 0b00001111; // break high
-	cli(); //disable interrupts
-	while(1){ // infinite loop of flashing leds
-		PORTL = 0xF0;
-		mTimer(500);
-		PORTL = 0x00;
-		mTimer(500);
-	}
+    PORTA = 0b00001111; // break high
+    cli(); //disable interrupts
+    while(1){ // infinite loop of flashing leds
+        PORTL = 0xF0;
+        mTimer(500);
+        PORTL = 0x00;
+        mTimer(500);
+    }
 }
 
 // Functions ++++++++++++++++++++++++++++++++++++++++++++++
 // mTimer, basic polling method timer, not interrupt driven
 void mTimer (int count) {
-	  
+      
    int i;
 
    i = 0;
@@ -109,12 +114,12 @@ void mTimer (int count) {
    
    //poll the timer
    while(i<count){
-	   if((TIFR1 & 0x02) == 0x02){
-		   TIFR1 |= _BV(OCF1A);//clear interrupt by writing a ONE to the bit
-		   i++;
-		   
-	   }//if
-	   
+       if((TIFR1 & 0x02) == 0x02){
+           TIFR1 |= _BV(OCF1A);//clear interrupt by writing a ONE to the bit
+           i++;
+           
+       }//if
+       
    }//while
    return;
 }
