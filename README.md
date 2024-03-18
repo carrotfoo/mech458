@@ -6,10 +6,9 @@ My mechatronics project
 mTimer
 INT2 OR (Optical Sensor OR) trigger
 INT3 Kill button
-
+Driving belt CW, CCW, and Braking
 
 ## Features to be added
-Driving belt CW, CCW, and Braking
 LCD control
 Reflectivity Sensor RL reading
 Optical Sensor EX Trigger
