@@ -1,4 +1,4 @@
- 
+
 /*
 * project.c
     Course      : UVic Mechatronics 458
@@ -15,7 +15,9 @@
 #include <avr/interrupt.h>
 
 // Global Variables =======================================
-unsigned int direction; //direction of belt
+volatile unsigned int direction; //direction of belt
+volatile unsigned int ADC_result;
+volatile unsigned int ADC_result_flag;
 
 
 // Function declerations ==================================
@@ -37,6 +39,10 @@ int main(){
     cli(); // disable global interrupts
     sei(); // enable global interrupts
 
+    // Configure Interrupt 1
+    EIMSK |= (_BV(INT1)); // enable INT3
+    EICRA |= (_BV(ISC11)); // falling edge interrupt
+
     // Configure Interrupt 2
     EIMSK |= (_BV(INT2)); // enable INT2
     EICRA |= (_BV(ISC21) | _BV(ISC20)); // rising edge interrupt
@@ -46,6 +52,11 @@ int main(){
     EICRA |= (_BV(ISC31)); // falling edge interrupt
 
     // Configure ADC
+    // by default, the ADC input (analog input is set to be ADC0 / PORTF0
+    ADCSRA |= _BV(ADEN); // enable ADC
+    ADCSRA |= _BV(ADIE); // enable interrupt of ADC
+    ADMUX |= _BV(REFS0); // select reference voltage to AVCC w/cap at AREF
+
 
     // Configure Pin I/O
     DDRA = 0x3f; // set six lsb of port a as output, controls motor
@@ -65,21 +76,37 @@ int main(){
 
     // Initialize LCD
 
-    direction = 1; //set initial direction
+    mot_CCW(); //set initial belt direction
+	
+	// start one conversion at the beginning ==========
+	ADCSRA |= _BV(ADSC);
+
+	
     while(1){
-        if (direction){ // 
-            mot_CW();
-            mTimer(5000);
-            mot_CCW();
-        }
+		if (ADC_result_flag){
+			
+			PORTC = ADC_result & 0b0011111111;
+			PORTL = ADC_result >> 4;
+			ADC_result_flag = 0x00;
+
+			// start ADC conversion ==========
+			ADCSRA |= _BV(ADSC);
+		}
 
     }
 
     return(0);    // this line should never execute
-
 }
 
 // ISRs ===================================================
+// Interrupt 1 EX
+ISR(INT1_vect){
+    mTimer(20);
+    PORTL = 0xF0;
+    mTimer(500);
+    PORTL = 0x00;
+}
+
 // Interrupt 2 OR Trigger
 ISR(INT2_vect){
     mTimer(20);
@@ -90,7 +117,6 @@ ISR(INT2_vect){
 
 // kill switch on button pull down
 ISR(INT3_vect){ //kill switch
-    //PORTA = 0b00001111; // break high
     mot_stop(); // break high
 	cli(); //disable interrupts
     while(1){ // infinite loop of flashing leds
@@ -99,6 +125,13 @@ ISR(INT3_vect){ //kill switch
         PORTL = 0x00;
         mTimer(500);
     }
+}
+
+// the interrupt will be trigured if the ADC is done ========================
+ISR(ADC_vect){
+	ADC_result = ADCL;
+	ADC_result = ADC_result | (ADCH << 8); // potential an issue according to Pat but it appears to work
+	ADC_result_flag = 1;
 }
 
 // Functions ++++++++++++++++++++++++++++++++++++++++++++++
