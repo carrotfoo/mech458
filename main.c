@@ -19,6 +19,7 @@
 volatile unsigned int direction; //direction of belt
 volatile unsigned int ADC_result;
 volatile unsigned int ADC_result_flag;
+volatile unsigned int min_refl;
 
 
 // Function declerations ==================================
@@ -73,7 +74,7 @@ int main(){
     //Set prescale value in TCCR0B
     TCCR0B = TCCR0B | 0b00000010; //set CS02, CS01 , CS00
     //Set OCRA to desired duty cycle
-    OCR0A = 0x7F; // 50% duty cycle
+    OCR0A = 0xBF; // 50% duty cycle
 
     // Initialize LCD
 	InitLCD(LS_ULINE);
@@ -86,17 +87,18 @@ int main(){
     mot_CCW(); //set initial belt direction
 	
 	// start one conversion at the beginning ==========
-	ADCSRA |= _BV(ADSC);
+	//ADCSRA |= _BV(ADSC);
 	
-
 	
     while(1){
 		if (ADC_result_flag){
-			
 			//PORTC = ADC_result & 0b0011111111;
 			//PORTL = ADC_result >> 4;
 			ADC_result_flag = 0x00;
-			
+			if(ADC_result < min_refl){
+				min_refl = ADC_result;
+			}
+
 			//Clear the screen
 			LCDClear();
 			
@@ -112,11 +114,15 @@ int main(){
 			//Write Motor speed to LCD
 			//LCDWriteIntXY(1,1,(ADC_result*100/255),3);
 			//LCDWriteStringXY(1,4,"%");
-			LCDWriteIntXY(0,1,ADC_result,4);
+			LCDWriteIntXY(0,1,min_refl,4);
 
-
-			// start ADC conversion ==========
-			ADCSRA |= _BV(ADSC);
+			if(ADC_result < 1023){
+				// start ADC conversion
+				ADCSRA |= _BV(ADSC);
+			}
+			else{
+				PORTL = 0xF0;
+			}
 		}
 
     }
@@ -127,18 +133,18 @@ int main(){
 // ISRs ===================================================
 // Interrupt 1 EX
 ISR(INT1_vect){
-    mTimer(20);
-    PORTL = 0xF0;
-    mTimer(500);
-    PORTL = 0x00;
+    //mTimer(20);
+    //PORTL = 0xF0;
+    //mTimer(500);
+    //PORTL = 0x00;
 }
 
 // Interrupt 2 OR Trigger
 ISR(INT2_vect){
     mTimer(20);
-    PORTL = 0xF0;
-    mTimer(500);
-    PORTL = 0x00;
+	PORTL = 0xF0;
+	min_refl = 1022;
+    ADCSRA |= _BV(ADSC); // start and ADC conversion
 }
 
 // kill switch on button pull down
@@ -160,7 +166,7 @@ ISR(ADC_vect){
 	ADC_result_flag = 1;
 }
 
-// Functions ++++++++++++++++++++++++++++++++++++++++++++++
+// Functions ==============================================
 // mTimer, basic polling method timer, not interrupt driven
 void mTimer (int count) {
 
