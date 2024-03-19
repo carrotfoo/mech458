@@ -9,10 +9,10 @@ INT3 Kill button
 Driving belt CW, CCW, and Braking
 Optical Sensor EX Trigger
 10 Bit ADC
+LCD control
+Reflectivity Sensor RL
 
 ## Features to be added
-LCD control
-Reflectivity Sensor RL reading
 Stepper motor control
 Hall-Effect sensor reading
 Block sorting
