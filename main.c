@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include "lcd.h" 
 
 // Global Variables =======================================
 volatile unsigned int direction; //direction of belt
@@ -75,19 +76,44 @@ int main(){
     OCR0A = 0x7F; // 50% duty cycle
 
     // Initialize LCD
+	InitLCD(LS_ULINE);
+	//Clear the screen
+	LCDClear();
+	//Simple string printing
+	LCDWriteString("Forward");
+
 
     mot_CCW(); //set initial belt direction
 	
 	// start one conversion at the beginning ==========
 	ADCSRA |= _BV(ADSC);
+	
 
 	
     while(1){
 		if (ADC_result_flag){
 			
-			PORTC = ADC_result & 0b0011111111;
-			PORTL = ADC_result >> 4;
+			//PORTC = ADC_result & 0b0011111111;
+			//PORTL = ADC_result >> 4;
 			ADC_result_flag = 0x00;
+			
+			//Clear the screen
+			LCDClear();
+			
+			if(direction)		//Print Direction
+			{
+				LCDWriteString("Forward");
+			}
+			else
+			{
+				LCDWriteString("Reverse");
+			}
+			
+			//Write Motor speed to LCD
+			//LCDWriteIntXY(1,1,(ADC_result*100/255),3);
+			//LCDWriteStringXY(1,4,"%");
+			LCDWriteIntXY(0,1,ADC_result,4);
+
 
 			// start ADC conversion ==========
 			ADCSRA |= _BV(ADSC);
@@ -130,7 +156,7 @@ ISR(INT3_vect){ //kill switch
 // the interrupt will be trigured if the ADC is done ========================
 ISR(ADC_vect){
 	ADC_result = ADCL;
-	ADC_result = ADC_result | (ADCH << 8); // potential an issue according to Pat but it appears to work
+	ADC_result = ADC_result | (ADCH << 8);
 	ADC_result_flag = 1;
 }
 
