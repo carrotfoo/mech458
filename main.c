@@ -42,7 +42,7 @@ int main(){
     sei(); // enable global interrupts
 
     // Configure Interrupt 1
-    EIMSK |= (_BV(INT1)); // enable INT3
+    EIMSK |= (_BV(INT1)); // enable INT1
     EICRA |= (_BV(ISC11)); // falling edge interrupt
 
     // Configure Interrupt 2
@@ -74,7 +74,7 @@ int main(){
     //Set prescale value in TCCR0B
     TCCR0B = TCCR0B | 0b00000010; //set CS02, CS01 , CS00
     //Set OCRA to desired duty cycle
-    OCR0A = 0xBF; // 50% duty cycle
+    OCR0A = 0xBF; // DC motor duty cycle
 
     // Initialize LCD
 	InitLCD(LS_ULINE);
@@ -92,14 +92,13 @@ int main(){
 	
     while(1){
 		if (ADC_result_flag){
-			//PORTC = ADC_result & 0b0011111111;
-			//PORTL = ADC_result >> 4;
+
 			ADC_result_flag = 0x00;
 			if(ADC_result < min_refl){
 				min_refl = ADC_result;
 			}
 
-			//Clear the screen
+			// Update LCD
 			LCDClear();
 			
 			if(direction)		//Print Direction
@@ -111,7 +110,7 @@ int main(){
 				LCDWriteString("Reverse");
 			}
 			
-			//Write Motor speed to LCD
+			//Write reflectivity of item to LCD
 			//LCDWriteIntXY(1,1,(ADC_result*100/255),3);
 			//LCDWriteStringXY(1,4,"%");
 			LCDWriteIntXY(0,1,min_refl,4);
@@ -139,7 +138,7 @@ ISR(INT1_vect){
     //PORTL = 0x00;
 }
 
-// Interrupt 2 OR Trigger
+// Interrupt 2 OR
 ISR(INT2_vect){
     mTimer(20);
 	PORTL = 0xF0;
