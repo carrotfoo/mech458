@@ -1,5 +1,5 @@
-
 /*
+
 * project.c
     Course      : UVic Mechatronics 458
     Milestone   : 5
@@ -23,11 +23,10 @@ volatile unsigned int min_refl;
 
 
 // Function declerations ==================================
-    //basic timer (such as mTimer)
-    void mTimer(int count);
-    void mot_CCW();     //motor forward
-    void mot_CW();      //motor backwards
-    void mot_stop();    //motor break
+void mTimer(int count);
+void mot_CCW();     //motor forward
+void mot_CW();      //motor backwards
+void mot_stop();    //motor break
 
 
 int main(){
