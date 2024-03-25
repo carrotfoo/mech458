@@ -21,12 +21,21 @@ volatile unsigned int ADC_result;
 volatile unsigned int ADC_result_flag;
 volatile unsigned int min_refl;
 
+volatile unsigned int home_flag;
+volatile unsigned int step = 1;
+
 
 // Function declerations ==================================
 void mTimer(int count);
 void mot_CCW();     //DC motor forward
 void mot_CW();      //DC motor backwards
 void mot_stop();    //DC motor break
+
+void executeStepSequence();
+void stepperhome();
+void stepper90();
+void stepperCW();
+void stepperCCW();
 
 
 int main(){
@@ -92,7 +101,7 @@ int main(){
 	LCDClear();
 	LCDWriteString("Forward");
 
-
+    stepperhome();  //start stepper on black
     mot_CCW(); //set initial belt direction
 	
 	// start one conversion at the beginning ==========
@@ -141,9 +150,7 @@ int main(){
 // ISRs ===================================================
 // Interrupt 0 HL
 ISR(INT0_vect){
-	PORTL = 0xF0;
-	mTimer(1000);
-	PORTL = 0x00;
+    home_flag = 1;
 }
 
 // Interrupt 1 EX
@@ -188,14 +195,9 @@ ISR(INT4_vect){ //kill switch
 
 // kill switch on button pull down
 ISR(INT5_vect){ //kill switch
-    mot_stop(); //break high
-	cli();      //disable interrupts
-    while(1){   // infinite loop of flashing leds
-        PORTL = 0xF0;
-        mTimer(500);
-        PORTL = 0x00;
-        mTimer(500);
-    }
+    mTimer(20); //debounce
+    sei();
+    stepperCW();
 }
 
 // the interrupt will be trigured if the ADC is done ========================
@@ -251,4 +253,65 @@ void mot_CW() {
 
 void mot_stop() {
     PORTA = 0b00001111; // Brake high to stop the motor
+}
+
+void executeStepSequence() {
+	// Assuming stepNumber ranges from 0 to 3, corresponding to steps 1 to 4
+	switch (step) {
+		case 0: // Step 1
+		PORTK = 0b00011011;
+		break;
+		case 1: // Step 2
+		PORTK = 0b00011101;
+		break;
+		case 2: // Step 3
+		PORTK = 0b00101101;
+		break;
+		case 3: // Step 4
+		PORTK = 0b00101011;
+		break;
+	}
+}
+
+void stepperhome(){
+    home_flag = 0;
+
+	while (home_flag == 0) {
+		step = (step + 1) % 4;
+		executeStepSequence();
+		mTimer(20); // Delay between steps for timing control
+	}
+}
+
+void stepper90(){
+    unsigned int volatile i = 0;
+
+    while(i < 100){
+        executeStepSequence();
+        step = (step + 1) % 4;
+        mTimer(20); // Delay between steps for timing control
+        i++;
+    }
+}
+
+void stepperCW(){
+    unsigned int volatile i = 0;
+
+    while(i < 50){
+        executeStepSequence();
+        step = (step + 1) % 4;
+        mTimer(20); // Delay between steps for timing control
+        i++;
+    }
+}
+
+void stepperCCW(){
+    unsigned int volatile i = 0;
+
+    while(i < 50){
+        executeStepSequence();
+        step = (step - 1) % 4;
+        mTimer(20); // Delay between steps for timing control
+        i++;
+    }
 }
