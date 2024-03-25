@@ -1,29 +1,41 @@
- 
 /*
+
 * project.c
     Course      : UVic Mechatronics 458
     Milestone   : 5
     Title       : Final Project
 
-    Name 1: Blake Baldwin    Student ID: V00917567
+    Name 1: Blake Baldwin   Student ID: V00917567
     Name 2: Hamza Siddique  Student ID: V00998771
 
- */
+*/
 
 #include <stdlib.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include "lcd.h" 
 
 // Global Variables =======================================
-unsigned int direction; //direction of belt
+volatile unsigned int direction; //direction of belt
+volatile unsigned int ADC_result;
+volatile unsigned int ADC_result_flag;
+volatile unsigned int min_refl;
+
+volatile unsigned int home_flag;
+volatile unsigned int step = 1;
 
 
 // Function declerations ==================================
-    //basic timer (such as mTimer)
-    void mTimer(int count);
-    void mot_CCW();     //motor forward
-    void mot_CW();      //motor backwards
-    void mot_stop();    //motor break
+void mTimer(int count);
+void mot_CCW();     //DC motor forward
+void mot_CW();      //DC motor backwards
+void mot_stop();    //DC motor break
+
+void executeStepSequence(); //follows defined stepper motor sequence
+void stepperhome(); //goes to stepper home (black)
+void stepper90();   //rotates stepper 90 degrees CW
+void stepperCW();   //rotates stepper 45 degrees CW
+void stepperCCW();  //rotates stepper 45 degrees CCW
 
 
 int main(){
@@ -37,23 +49,45 @@ int main(){
     cli(); // disable global interrupts
     sei(); // enable global interrupts
 
+    // Configure Interrupt 0
+    EIMSK |= (_BV(INT0));   // enable INT0
+    EICRA |= (_BV(ISC01));  // falling edge interrupt
+
+    // Configure Interrupt 1
+    EIMSK |= (_BV(INT1));   // enable INT1
+    EICRA |= (_BV(ISC11));  // falling edge interrupt
+
     // Configure Interrupt 2
-    EIMSK |= (_BV(INT2)); // enable INT2
+    EIMSK |= (_BV(INT2));   // enable INT2
     EICRA |= (_BV(ISC21) | _BV(ISC20)); // rising edge interrupt
 
     // Configure Interrupt 3
-    EIMSK |= (_BV(INT3)); // enable INT3
-    EICRA |= (_BV(ISC31)); // falling edge interrupt
+    EIMSK |= (_BV(INT3));   // enable INT3
+    EICRA |= (_BV(ISC31));  // falling edge interrupt
+
+    // Configure Interrupt 4
+    EIMSK |= (_BV(INT4));   // enable INT4
+    EICRB |= (_BV(ISC41));  // falling edge interrupt
+
+    // Configure Interrupt 5
+    EIMSK |= (_BV(INT5));   // enable INT5
+    EICRB |= (_BV(ISC51));  // falling edge interrupt
 
     // Configure ADC
+    // by default, the ADC input (analog input is set to be ADC0 / PORTF0
+    ADCSRA |= _BV(ADEN); // enable ADC
+    ADCSRA |= _BV(ADIE); // enable interrupt of ADC
+    ADMUX |= _BV(REFS0); // select reference voltage to AVCC w/cap at AREF
+
 
     // Configure Pin I/O
     DDRA = 0x3f; // set six lsb of port a as output, controls motor
-    DDRB = 0xff; // set port b as output
-    DDRC = 0xff; // set port c as output
-    DDRL = 0xf0; // set 4 msb of port l as output
+    DDRB = 0x80; // set MSB of port b as output, controls PWM
+    DDRC = 0xff; // set port c as output, controls LCD
+    DDRK = 0x3f; // set six lsb of port k as output, controls stepper
+    DDRL = 0xf0; // set four msb of port l as output, controls LEDs
 
-    // Configure PWM TODO change below to use _BV function
+    // Configure PWM (TODO change below to use _BV function)
     //Set Timer 0 to Fast PWM
     TCCR0A = TCCR0A | 0b00000011; //enable WGM01 & WGM00
     //Set compare match output mode clear on compare match
@@ -61,39 +95,98 @@ int main(){
     //Set prescale value in TCCR0B
     TCCR0B = TCCR0B | 0b00000010; //set CS02, CS01 , CS00
     //Set OCRA to desired duty cycle
-    OCR0A = 0x7F; // 50% duty cycle
+    OCR0A = 0x7F; // DC motor duty cycle
 
     // Initialize LCD
+	InitLCD(LS_ULINE);
+	LCDClear();
+	LCDWriteString("Forward");
 
-    direction = 1; //set initial direction
+    stepperhome();  //start stepper on black
+    mot_CCW(); //set initial belt direction
+	
+	// start one conversion at the beginning ==========
+	//ADCSRA |= _BV(ADSC);
+	
+	
     while(1){
-        if (direction){ // 
-            mot_CW();
-            mTimer(5000);
-            mot_CCW();
-        }
+		if (ADC_result_flag){
+
+			ADC_result_flag = 0x00;
+			if(ADC_result < min_refl){
+				min_refl = ADC_result;
+			}
+
+			// Update LCD
+			LCDClear();
+			
+			if(direction)		//Print Direction
+			{
+				LCDWriteString("Forward");
+			}
+			else
+			{
+				LCDWriteString("Reverse");
+			}
+			
+			//Write reflectivity of item to LCD
+			//LCDWriteIntXY(1,1,(ADC_result*100/255),3);
+			//LCDWriteStringXY(1,4,"%");
+			LCDWriteIntXY(0,1,min_refl,4);
+
+			if(ADC_result < 1023){
+				// start ADC conversion
+				ADCSRA |= _BV(ADSC);
+			}
+			else{
+				PORTL = 0xf0;
+			}
+		}
 
     }
 
     return(0);    // this line should never execute
-
 }
 
 // ISRs ===================================================
-// Interrupt 2 OR Trigger
+// Interrupt 0 HL
+ISR(INT0_vect){
+    home_flag = 1;
+}
+
+// Interrupt 1 EX
+ISR(INT1_vect){
+    //mTimer(20);
+    //PORTL = 0xF0;
+    //mTimer(500);
+    //PORTL = 0x00;
+}
+
+// Interrupt 2 OR
 ISR(INT2_vect){
     mTimer(20);
-    PORTL = 0xF0;
-    mTimer(500);
-    PORTL = 0x00;
+	PORTL = 0xF0;
+	min_refl = 1022;
+    ADCSRA |= _BV(ADSC); // start and ADC conversion
 }
 
 // kill switch on button pull down
 ISR(INT3_vect){ //kill switch
-    //PORTA = 0b00001111; // break high
-    mot_stop(); // break high
-	cli(); //disable interrupts
-    while(1){ // infinite loop of flashing leds
+    /*mot_stop(); //break high
+	cli();      //disable interrupts
+    while(1){   // infinite loop of flashing leds
+        PORTL = 0xF0;
+        mTimer(500);
+        PORTL = 0x00;
+        mTimer(500);
+    }*/
+}
+
+// kill switch on button pull down
+ISR(INT4_vect){ //kill switch
+    mot_stop(); //break high
+	cli();      //disable interrupts
+    while(1){   // infinite loop of flashing leds
         PORTL = 0xF0;
         mTimer(500);
         PORTL = 0x00;
@@ -101,7 +194,21 @@ ISR(INT3_vect){ //kill switch
     }
 }
 
-// Functions ++++++++++++++++++++++++++++++++++++++++++++++
+// Test button
+ISR(INT5_vect){
+    mTimer(20); //debounce
+    sei();      //enable interrupts 
+    stepperCW();
+}
+
+// the interrupt will be trigured if the ADC is done ========================
+ISR(ADC_vect){
+	ADC_result = ADCL;
+	ADC_result = ADC_result | (ADCH << 8);
+	ADC_result_flag = 1;
+}
+
+// Functions ==============================================
 // mTimer, basic polling method timer, not interrupt driven
 void mTimer (int count) {
 
@@ -133,18 +240,79 @@ void mTimer (int count) {
 
 void mot_CCW() {
     PORTA = 0b00001111; // Initially brake
-    mTimer(20); // Wait a bit
+    mTimer(20); // Wait
     PORTA = 0b00001110; // Drive forward (CCW)
 	direction = 1;
 }
 
 void mot_CW() {
     PORTA = 0b00001111; // Initially brake
-    mTimer(20); // Wait a bit
+    mTimer(20); // Wait
     PORTA = 0b00001101; // Drive reverse (CW)
 	direction = 0;
 }
 
 void mot_stop() {
     PORTA = 0b00001111; // Brake high to stop the motor
+}
+
+void executeStepSequence() {
+	// Assuming stepNumber ranges from 0 to 3, corresponding to steps 1 to 4
+	switch (step) {
+		case 0: // Step 1
+		PORTK = 0b00011011;
+		break;
+		case 1: // Step 2
+		PORTK = 0b00011101;
+		break;
+		case 2: // Step 3
+		PORTK = 0b00101101;
+		break;
+		case 3: // Step 4
+		PORTK = 0b00101011;
+		break;
+	}
+}
+
+void stepperhome(){
+    home_flag = 0;
+
+	while (home_flag == 0) {
+		step = (step + 1) % 4;
+		executeStepSequence();
+		mTimer(20); // Delay between steps for timing control
+	}
+}
+
+void stepper90(){
+    unsigned int volatile i = 0;
+
+    while(i < 100){
+        executeStepSequence();
+        step = (step + 1) % 4;
+        mTimer(20); // Delay between steps for timing control
+        i++;
+    }
+}
+
+void stepperCW(){
+    unsigned int volatile i = 0;
+
+    while(i < 50){
+        executeStepSequence();
+        step = (step + 1) % 4;
+        mTimer(20); // Delay between steps for timing control
+        i++;
+    }
+}
+
+void stepperCCW(){
+    unsigned int volatile i = 0;
+
+    while(i < 50){
+        executeStepSequence();
+        step = (step - 1) % 4;
+        mTimer(20); // Delay between steps for timing control
+        i++;
+    }
 }
