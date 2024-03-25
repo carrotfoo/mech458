@@ -56,6 +56,14 @@ int main(){
     EIMSK |= (_BV(INT3));   // enable INT3
     EICRA |= (_BV(ISC31));  // falling edge interrupt
 
+    // Configure Interrupt 4
+    EIMSK |= (_BV(INT4));   // enable INT4
+    EICRB |= (_BV(ISC41));  // falling edge interrupt
+
+    // Configure Interrupt 5
+    EIMSK |= (_BV(INT5));   // enable INT5
+    EICRB |= (_BV(ISC51));  // falling edge interrupt
+
     // Configure ADC
     // by default, the ADC input (analog input is set to be ADC0 / PORTF0
     ADCSRA |= _BV(ADEN); // enable ADC
@@ -156,6 +164,30 @@ ISR(INT2_vect){
 
 // kill switch on button pull down
 ISR(INT3_vect){ //kill switch
+    /*mot_stop(); //break high
+	cli();      //disable interrupts
+    while(1){   // infinite loop of flashing leds
+        PORTL = 0xF0;
+        mTimer(500);
+        PORTL = 0x00;
+        mTimer(500);
+    }*/
+}
+
+// kill switch on button pull down
+ISR(INT4_vect){ //kill switch
+    mot_stop(); //break high
+	cli();      //disable interrupts
+    while(1){   // infinite loop of flashing leds
+        PORTL = 0xF0;
+        mTimer(500);
+        PORTL = 0x00;
+        mTimer(500);
+    }
+}
+
+// kill switch on button pull down
+ISR(INT5_vect){ //kill switch
     mot_stop(); //break high
 	cli();      //disable interrupts
     while(1){   // infinite loop of flashing leds
