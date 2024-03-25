@@ -31,11 +31,11 @@ void mot_CCW();     //DC motor forward
 void mot_CW();      //DC motor backwards
 void mot_stop();    //DC motor break
 
-void executeStepSequence();
-void stepperhome();
-void stepper90();
-void stepperCW();
-void stepperCCW();
+void executeStepSequence(); //follows defined stepper motor sequence
+void stepperhome(); //goes to stepper home (black)
+void stepper90();   //rotates stepper 90 degrees CW
+void stepperCW();   //rotates stepper 45 degrees CW
+void stepperCCW();  //rotates stepper 45 degrees CCW
 
 
 int main(){
@@ -82,9 +82,10 @@ int main(){
 
     // Configure Pin I/O
     DDRA = 0x3f; // set six lsb of port a as output, controls motor
-    DDRB = 0xff; // set port b as output
-    DDRC = 0xff; // set port c as output
-    DDRL = 0xf0; // set 4 msb of port l as output
+    DDRB = 0x80; // set MSB of port b as output, controls PWM
+    DDRC = 0xff; // set port c as output, controls LCD
+    DDRK = 0x3f; // set six lsb of port k as output, controls stepper
+    DDRL = 0xf0; // set four msb of port l as output, controls LEDs
 
     // Configure PWM (TODO change below to use _BV function)
     //Set Timer 0 to Fast PWM
@@ -94,7 +95,7 @@ int main(){
     //Set prescale value in TCCR0B
     TCCR0B = TCCR0B | 0b00000010; //set CS02, CS01 , CS00
     //Set OCRA to desired duty cycle
-    OCR0A = 0xBF; // DC motor duty cycle
+    OCR0A = 0x7F; // DC motor duty cycle
 
     // Initialize LCD
 	InitLCD(LS_ULINE);
@@ -138,7 +139,7 @@ int main(){
 				ADCSRA |= _BV(ADSC);
 			}
 			else{
-				PORTL = 0xF0;
+				PORTL = 0xf0;
 			}
 		}
 
@@ -193,10 +194,10 @@ ISR(INT4_vect){ //kill switch
     }
 }
 
-// kill switch on button pull down
-ISR(INT5_vect){ //kill switch
+// Test button
+ISR(INT5_vect){
     mTimer(20); //debounce
-    sei();
+    sei();      //enable interrupts 
     stepperCW();
 }
 
@@ -239,14 +240,14 @@ void mTimer (int count) {
 
 void mot_CCW() {
     PORTA = 0b00001111; // Initially brake
-    mTimer(20); // Wait a bit
+    mTimer(20); // Wait
     PORTA = 0b00001110; // Drive forward (CCW)
 	direction = 1;
 }
 
 void mot_CW() {
     PORTA = 0b00001111; // Initially brake
-    mTimer(20); // Wait a bit
+    mTimer(20); // Wait
     PORTA = 0b00001101; // Drive reverse (CW)
 	direction = 0;
 }
