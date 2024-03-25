@@ -5,10 +5,10 @@
     Milestone   : 5
     Title       : Final Project
 
-    Name 1: Blake Baldwin    Student ID: V00917567
+    Name 1: Blake Baldwin   Student ID: V00917567
     Name 2: Hamza Siddique  Student ID: V00998771
 
- */
+*/
 
 #include <stdlib.h>
 #include <avr/io.h>
@@ -24,9 +24,9 @@ volatile unsigned int min_refl;
 
 // Function declerations ==================================
 void mTimer(int count);
-void mot_CCW();     //motor forward
-void mot_CW();      //motor backwards
-void mot_stop();    //motor break
+void mot_CCW();     //DC motor forward
+void mot_CW();      //DC motor backwards
+void mot_stop();    //DC motor break
 
 
 int main(){
@@ -40,17 +40,21 @@ int main(){
     cli(); // disable global interrupts
     sei(); // enable global interrupts
 
+    // Configure Interrupt 0
+    EIMSK |= (_BV(INT0));   // enable INT0
+    EICRA |= (_BV(ISC01));  // falling edge interrupt
+
     // Configure Interrupt 1
-    EIMSK |= (_BV(INT1)); // enable INT1
-    EICRA |= (_BV(ISC11)); // falling edge interrupt
+    EIMSK |= (_BV(INT1));   // enable INT1
+    EICRA |= (_BV(ISC11));  // falling edge interrupt
 
     // Configure Interrupt 2
-    EIMSK |= (_BV(INT2)); // enable INT2
+    EIMSK |= (_BV(INT2));   // enable INT2
     EICRA |= (_BV(ISC21) | _BV(ISC20)); // rising edge interrupt
 
     // Configure Interrupt 3
-    EIMSK |= (_BV(INT3)); // enable INT3
-    EICRA |= (_BV(ISC31)); // falling edge interrupt
+    EIMSK |= (_BV(INT3));   // enable INT3
+    EICRA |= (_BV(ISC31));  // falling edge interrupt
 
     // Configure ADC
     // by default, the ADC input (analog input is set to be ADC0 / PORTF0
@@ -65,7 +69,7 @@ int main(){
     DDRC = 0xff; // set port c as output
     DDRL = 0xf0; // set 4 msb of port l as output
 
-    // Configure PWM TODO change below to use _BV function
+    // Configure PWM (TODO change below to use _BV function)
     //Set Timer 0 to Fast PWM
     TCCR0A = TCCR0A | 0b00000011; //enable WGM01 & WGM00
     //Set compare match output mode clear on compare match
@@ -77,9 +81,7 @@ int main(){
 
     // Initialize LCD
 	InitLCD(LS_ULINE);
-	//Clear the screen
 	LCDClear();
-	//Simple string printing
 	LCDWriteString("Forward");
 
 
@@ -129,6 +131,13 @@ int main(){
 }
 
 // ISRs ===================================================
+// Interrupt 0 HL
+ISR(INT0_vect){
+	PORTL = 0xF0;
+	mTimer(1000);
+	PORTL = 0x00;
+}
+
 // Interrupt 1 EX
 ISR(INT1_vect){
     //mTimer(20);
@@ -147,9 +156,9 @@ ISR(INT2_vect){
 
 // kill switch on button pull down
 ISR(INT3_vect){ //kill switch
-    mot_stop(); // break high
-	cli(); //disable interrupts
-    while(1){ // infinite loop of flashing leds
+    mot_stop(); //break high
+	cli();      //disable interrupts
+    while(1){   // infinite loop of flashing leds
         PORTL = 0xF0;
         mTimer(500);
         PORTL = 0x00;
