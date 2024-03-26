@@ -16,13 +16,14 @@
 #include "lcd.h" 
 
 // Global Variables =======================================
-volatile unsigned int direction; //direction of belt
+volatile unsigned char direction; //direction of belt
 volatile unsigned int ADC_result;
-volatile unsigned int ADC_result_flag;
+volatile unsigned char ADC_result_flag;
 volatile unsigned int min_refl;
 
-volatile unsigned int home_flag;
-volatile unsigned int step = 1;
+volatile unsigned char home_flag;
+volatile unsigned char step = 1;
+volatile unsigned char loc_stepper;
 
 
 // Function declerations ==================================
@@ -105,9 +106,6 @@ int main(){
     stepperhome();  //start stepper on black
     mot_CCW(); //set initial belt direction
 	
-	// start one conversion at the beginning ==========
-	//ADCSRA |= _BV(ADSC);
-	
 	
     while(1){
 		if (ADC_result_flag){
@@ -133,6 +131,8 @@ int main(){
 			//LCDWriteIntXY(1,1,(ADC_result*100/255),3);
 			//LCDWriteStringXY(1,4,"%");
 			LCDWriteIntXY(0,1,min_refl,4);
+
+            LCDWriteIntXY(6,1,loc_stepper,1);
 
 			if(ADC_result < 1023){
 				// start ADC conversion
@@ -282,6 +282,7 @@ void stepperhome(){
 		executeStepSequence();
 		mTimer(20); // Delay between steps for timing control
 	}
+    loc_stepper = 0;
 }
 
 void stepper90(){
@@ -293,6 +294,7 @@ void stepper90(){
         mTimer(20); // Delay between steps for timing control
         i++;
     }
+    loc_stepper = (loc_stepper + 2) % 4;
 }
 
 void stepperCW(){
@@ -304,15 +306,29 @@ void stepperCW(){
         mTimer(20); // Delay between steps for timing control
         i++;
     }
+    loc_stepper = (loc_stepper + 1) % 4;
 }
 
 void stepperCCW(){
     unsigned int volatile i = 0;
 
     while(i < 50){
-        executeStepSequence();
-        step = (step - 1) % 4;
+        executeStepSequence();        
+        if(step << 0){
+            step--;
+        }
+        else{
+            step = 3;
+        }
+
         mTimer(20); // Delay between steps for timing control
         i++;
+    }
+
+    if(loc_stepper << 0){
+        loc_stepper--;
+    }
+    else{
+        loc_stepper = 3;
     }
 }
